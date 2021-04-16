@@ -1,0 +1,66 @@
+- hosts: localhost
+  tasks:
+  - yum_repository:
+           baseurl: "https://download.docker.com/linux/centos/7/x86_64/stable/"
+           name: "dockerce"
+           description: "this is docker"
+           gpgcheck: no
+
+  - command: "rpm -q docker"
+    register: x
+    ignore_errors: yes
+
+  - command: "yum install docker-ce --nobest -y"
+    when: x.rc == 1
+
+  - service:
+           name: "docker"
+           state: started
+
+  - pip:
+           name: "docker-py>=1.7.0"
+           state: present
+
+  - name: creating a directory
+    file:
+           state: directory
+           dest: "/root/dockernew"
+
+
+  - name: Creating html code
+    copy:
+           dest: "/root/dockernew/index.html"
+           content: "this is Rishabh testing the image"
+
+  - community.general.docker_container:
+          name: ssh_test2_centos
+          image: ssh_cofig:v2
+          state: started
+          volumes: 
+            - "/root/dockernew:/var/www/html"
+          ports:
+            - "8080:80"
+    register: y
+    
+  - debug:
+      var: y.ansible_facts['docker_container'].NetworkSettings['IPAddress']
+
+  - blockinfile:
+          dest: "/root/test.txt"
+          block: |
+                  [dockertest]
+                  {{ y.ansible_facts['docker_container'].NetworkSettings['IPAddress'] }} ansible_user=root ansible_ssh_pass=redhat ansible_connection=ssh
+          marker: ""
+
+- hosts: 172.17.0.2
+  tasks:  
+  - name: "Installin the httpd"
+    package:
+      name: "httpd"
+      state: present
+
+  - name: "service started"
+    service: 
+     name: "httpd"
+     state: started
+
